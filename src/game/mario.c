@@ -390,45 +390,8 @@ s32 mario_get_floor_class(struct MarioState *m) {
     // The slide terrain type defaults to slide slipperiness.
     // This doesn't matter too much since normally the slide terrain
     // is checked for anyways.
-    if ((m->area->terrainType & TERRAIN_MASK) == TERRAIN_SLIDE) {
-        floorClass = SURFACE_CLASS_VERY_SLIPPERY;
-    } else {
-        floorClass = SURFACE_CLASS_DEFAULT;
-    }
 
-    if (m->floor != NULL) {
-        switch (m->floor->type) {
-            case SURFACE_NOT_SLIPPERY:
-            case SURFACE_HARD_NOT_SLIPPERY:
-            case SURFACE_SWITCH:
-                floorClass = SURFACE_CLASS_NOT_SLIPPERY;
-                break;
-
-            case SURFACE_SLIPPERY:
-            case SURFACE_NOISE_SLIPPERY:
-            case SURFACE_HARD_SLIPPERY:
-            case SURFACE_NO_CAM_COL_SLIPPERY:
-                floorClass = SURFACE_CLASS_SLIPPERY;
-                break;
-
-            case SURFACE_VERY_SLIPPERY:
-            case SURFACE_ICE:
-            case SURFACE_HARD_VERY_SLIPPERY:
-            case SURFACE_NOISE_VERY_SLIPPERY_73:
-            case SURFACE_NOISE_VERY_SLIPPERY_74:
-            case SURFACE_NOISE_VERY_SLIPPERY:
-            case SURFACE_NO_CAM_COL_VERY_SLIPPERY:
-                floorClass = SURFACE_CLASS_VERY_SLIPPERY;
-                break;
-        }
-    }
-
-    // Crawling allows Mario to not slide on certain steeper surfaces.
-    if (m->action == ACT_CRAWLING && m->floor->normal.y > 0.5f && floorClass == SURFACE_CLASS_DEFAULT) {
-        floorClass = SURFACE_CLASS_NOT_SLIPPERY;
-    }
-
-    return floorClass;
+    return SURFACE_NOT_SLIPPERY;
 }
 
 // clang-format off
@@ -571,101 +534,21 @@ s32 mario_facing_downhill(struct MarioState *m, s32 turnYaw) {
  * Determines if a surface is slippery based on the surface class.
  */
 u32 mario_floor_is_slippery(struct MarioState *m) {
-    f32 normY;
-
-    if ((m->area->terrainType & TERRAIN_MASK) == TERRAIN_SLIDE
-        && m->floor->normal.y < 0.9998477f //~cos(1 deg)
-    ) {
-        return TRUE;
-    }
-
-    switch (mario_get_floor_class(m)) {
-        case SURFACE_VERY_SLIPPERY:
-            normY = 0.9848077f; //~cos(10 deg)
-            break;
-
-        case SURFACE_SLIPPERY:
-            normY = 0.9396926f; //~cos(20 deg)
-            break;
-
-        default:
-            normY = 0.7880108f; //~cos(38 deg)
-            break;
-
-        case SURFACE_NOT_SLIPPERY:
-            normY = 0.0f;
-            break;
-    }
-
-    return m->floor->normal.y <= normY;
+    return FALSE;
 }
 
 /**
  * Determines if a surface is a slope based on the surface class.
  */
 s32 mario_floor_is_slope(struct MarioState *m) {
-    f32 normY;
-
-    if ((m->area->terrainType & TERRAIN_MASK) == TERRAIN_SLIDE
-        && m->floor->normal.y < 0.9998477f) { // ~cos(1 deg)
-        return TRUE;
-    }
-
-    switch (mario_get_floor_class(m)) {
-        case SURFACE_VERY_SLIPPERY:
-            normY = 0.9961947f; // ~cos(5 deg)
-            break;
-
-        case SURFACE_SLIPPERY:
-            normY = 0.9848077f; // ~cos(10 deg)
-            break;
-
-        default:
-            normY = 0.9659258f; // ~cos(15 deg)
-            break;
-
-        case SURFACE_NOT_SLIPPERY:
-            normY = 0.9396926f; // ~cos(20 deg)
-            break;
-    }
-
-    return m->floor->normal.y <= normY;
+    return FALSE;
 }
 
 /**
  * Determines if a surface is steep based on the surface class.
  */
 s32 mario_floor_is_steep(struct MarioState *m) {
-    f32 normY;
-    s32 result = FALSE;
-
-    // Interestingly, this function does not check for the
-    // slide terrain type. This means that steep behavior persists for
-    // non-slippery and slippery surfaces.
-    // This does not matter in vanilla game practice.
-    if (!mario_facing_downhill(m, FALSE)) {
-        switch (mario_get_floor_class(m)) {
-            case SURFACE_VERY_SLIPPERY:
-                normY = 0.9659258f; // ~cos(15 deg)
-                break;
-
-            case SURFACE_SLIPPERY:
-                normY = 0.9396926f; // ~cos(20 deg)
-                break;
-
-            default:
-                normY = 0.8660254f; // ~cos(30 deg)
-                break;
-
-            case SURFACE_NOT_SLIPPERY:
-                normY = 0.8660254f; // ~cos(30 deg)
-                break;
-        }
-
-        result = m->floor->normal.y <= normY;
-    }
-
-    return result;
+    return FALSE;
 }
 
 /**
@@ -763,11 +646,8 @@ void set_steep_jump_action(struct MarioState *m) {
 static void set_mario_y_vel_based_on_fspeed(struct MarioState *m, f32 initialVelY, f32 multiplier) {
     // get_additive_y_vel_for_jumps is always 0 and a stubbed function.
     // It was likely trampoline related based on code location.
-    m->vel[1] = initialVelY + get_additive_y_vel_for_jumps() + m->forwardVel * multiplier;
+    m->vel[1] = initialVelY + get_additive_y_vel_for_jumps() + m->forwardVel * multiplier * 1.5f;
 
-    if (m->squishTimer != 0 || m->quicksandDepth > 1.0f) {
-        m->vel[1] *= 0.5f;
-    }
 }
 
 /**
@@ -784,7 +664,6 @@ static u32 set_mario_action_airborne(struct MarioState *m, u32 action, u32 actio
     switch (action) {
         case ACT_DOUBLE_JUMP:
             set_mario_y_vel_based_on_fspeed(m, 52.0f, 0.25f);
-            m->forwardVel *= 0.8f;
             break;
 
         case ACT_BACKFLIP:
@@ -795,7 +674,6 @@ static u32 set_mario_action_airborne(struct MarioState *m, u32 action, u32 actio
 
         case ACT_TRIPLE_JUMP:
             set_mario_y_vel_based_on_fspeed(m, 69.0f, 0.0f);
-            m->forwardVel *= 0.8f;
             break;
 
         case ACT_FLYING_TRIPLE_JUMP:
@@ -810,7 +688,7 @@ static u32 set_mario_action_airborne(struct MarioState *m, u32 action, u32 actio
             break;
 
         case ACT_BURNING_JUMP:
-            m->vel[1] = 31.5f;
+            m->vel[1] += 31.5f;
             m->forwardVel = 8.0f;
             break;
 
@@ -822,21 +700,17 @@ static u32 set_mario_action_airborne(struct MarioState *m, u32 action, u32 actio
         case ACT_HOLD_JUMP:
             m->marioObj->header.gfx.animInfo.animID = -1;
             set_mario_y_vel_based_on_fspeed(m, 42.0f, 0.25f);
-            m->forwardVel *= 0.8f;
             break;
 
         case ACT_WALL_KICK_AIR:
         case ACT_TOP_OF_POLE_JUMP:
             set_mario_y_vel_based_on_fspeed(m, 62.0f, 0.0f);
-            if (m->forwardVel < 24.0f) {
-                m->forwardVel = 24.0f;
-            }
             m->wallKickTimer = 0;
             break;
 
         case ACT_SIDE_FLIP:
             set_mario_y_vel_based_on_fspeed(m, 62.0f, 0.0f);
-            m->forwardVel = 8.0f;
+            m->forwardVel = 10.0f;
             m->faceAngle[1] = m->intendedYaw;
             break;
 
@@ -847,7 +721,7 @@ static u32 set_mario_action_airborne(struct MarioState *m, u32 action, u32 actio
             break;
 
         case ACT_LAVA_BOOST:
-            m->vel[1] = 84.0f;
+            m->vel[1] += 90.0f;
             if (actionArg == 0) {
                 m->forwardVel = 0.0f;
             }
@@ -865,18 +739,11 @@ static u32 set_mario_action_airborne(struct MarioState *m, u32 action, u32 actio
             set_mario_y_vel_based_on_fspeed(m, 30.0f, 0.0f);
             m->marioObj->oMarioLongJumpIsSlow = m->forwardVel > 16.0f ? FALSE : TRUE;
 
-            //! (BLJ's) This properly handles long jumps from getting forward speed with
-            //  too much velocity, but misses backwards longs allowing high negative speeds.
-            if ((m->forwardVel *= 1.5f) > 48.0f) {
-                m->forwardVel = 48.0f;
-            }
             break;
 
         case ACT_SLIDE_KICK:
             m->vel[1] = 12.0f;
-            if (m->forwardVel < 32.0f) {
-                m->forwardVel = 32.0f;
-            }
+
             break;
 
         case ACT_JUMP_KICK:
@@ -1233,7 +1100,7 @@ void debug_print_speed_action_normal(struct MarioState *m) {
     f32 steepness;
     f32 floor_nY;
 
-    if (gShowDebugText) {
+    if (TRUE) {
         steepness = sqrtf(
             ((m->floor->normal.x * m->floor->normal.x) + (m->floor->normal.z * m->floor->normal.z)));
         floor_nY = m->floor->normal.y;
