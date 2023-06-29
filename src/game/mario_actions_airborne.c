@@ -900,10 +900,6 @@ s32 act_ground_pound(struct MarioState *m) {
                 }
             }
 
-            if (m->input & INPUT_A_PRESSED) {
-                set_mario_action(m, ACT_JUMP, 0);
-                m->vel[1] += 20.0f;
-            }
 
             set_camera_shake_from_hit(SHAKE_GROUND_POUND);
         } else if (stepResult == AIR_STEP_HIT_WALL) {
