@@ -59,49 +59,6 @@ s32 lava_boost_on_wall(struct MarioState *m) {
 }
 
 s32 check_fall_damage(struct MarioState *m, u32 hardFallAction) {
-    f32 fallHeight;
-    f32 damageHeight;
-
-    fallHeight = m->peakHeight - m->pos[1];
-
-#pragma GCC diagnostic push
-#if defined(__clang__)
-#pragma GCC diagnostic ignored "-Wtautological-constant-out-of-range-compare"
-#elif defined(__GNUC__)
-#pragma GCC diagnostic ignored "-Wtype-limits"
-#endif
-
-    //! Never true
-    if (m->actionState == ACT_GROUND_POUND) {
-        damageHeight = 600.0f;
-    } else {
-        damageHeight = 1150.0f;
-    }
-
-#pragma GCC diagnostic pop
-
-    if (m->action != ACT_TWIRLING && m->floor->type != SURFACE_BURNING) {
-        if (m->vel[1] < -55.0f) {
-            if (fallHeight > 3000.0f) {
-                m->hurtCounter += (m->flags & MARIO_CAP_ON_HEAD) ? 16 : 24;
-#if ENABLE_RUMBLE
-                queue_rumble_data(5, 80);
-#endif
-                set_camera_shake_from_hit(SHAKE_FALL_DAMAGE);
-                play_sound(SOUND_MARIO_ATTACKED, m->marioObj->header.gfx.cameraToObject);
-                return drop_and_set_mario_action(m, hardFallAction, 4);
-            } else if (fallHeight > damageHeight && !mario_floor_is_slippery(m)) {
-                m->hurtCounter += (m->flags & MARIO_CAP_ON_HEAD) ? 8 : 12;
-                m->squishTimer = 30;
-#if ENABLE_RUMBLE
-                queue_rumble_data(5, 80);
-#endif
-                set_camera_shake_from_hit(SHAKE_FALL_DAMAGE);
-                play_sound(SOUND_MARIO_ATTACKED, m->marioObj->header.gfx.cameraToObject);
-            }
-        }
-    }
-
     return FALSE;
 }
 
@@ -113,37 +70,11 @@ s32 check_kick_or_dive_in_air(struct MarioState *m) {
 }
 
 s32 should_get_stuck_in_ground(struct MarioState *m) {
-    u32 terrainType = m->area->terrainType & TERRAIN_MASK;
-    struct Surface *floor = m->floor;
-    s32 flags = floor->flags;
-    s32 type = floor->type;
-
-    if (floor != NULL && (terrainType == TERRAIN_SNOW || terrainType == TERRAIN_SAND)
-        && type != SURFACE_BURNING && SURFACE_IS_NOT_HARD(type)) {
-        if (!(flags & 0x01) && m->peakHeight - m->pos[1] > 1000.0f && floor->normal.y >= 0.8660254f) {
-            return TRUE;
-        }
-    }
-
     return FALSE;
 }
 
 s32 check_fall_damage_or_get_stuck(struct MarioState *m, u32 hardFallAction) {
-    if (should_get_stuck_in_ground(m)) {
-#ifdef VERSION_JP
-        play_sound(SOUND_MARIO_OOOF, m->marioObj->header.gfx.cameraToObject);
-#else
-        play_sound(SOUND_MARIO_OOOF2, m->marioObj->header.gfx.cameraToObject);
-#endif
-        m->particleFlags |= PARTICLE_MIST_CIRCLE;
-        drop_and_set_mario_action(m, ACT_FEET_STUCK_IN_GROUND, 0);
-#if ENABLE_RUMBLE
-        queue_rumble_data(5, 80);
-#endif
-        return TRUE;
-    }
-
-    return check_fall_damage(m, hardFallAction);
+    return FALSE;
 }
 
 s32 check_horizontal_wind(struct MarioState *m) {
@@ -968,6 +899,12 @@ s32 act_ground_pound(struct MarioState *m) {
                     set_mario_action(m, ACT_GROUND_POUND_LAND, 0);
                 }
             }
+
+            if (m->input & INPUT_A_PRESSED) {
+                set_mario_action(m, ACT_JUMP, 0);
+                m->vel[1] += 20.0f
+            }
+
             set_camera_shake_from_hit(SHAKE_GROUND_POUND);
         } else if (stepResult == AIR_STEP_HIT_WALL) {
             mario_set_forward_vel(m, -16.0f);
